@@ -9,6 +9,9 @@ import Panel from "./components/Panel.jsx";
 import TopBar from "./components/TopBar.jsx";
 import Toast from "./components/Toast.jsx";
 import History from "./components/History.jsx";
+import AuroraBackground from "./components/AuroraBackground.jsx";
+import GameAgent from "./components/GameAgent.jsx";
+import { sounds, warmup } from "./components/SoundManager.jsx";
 
 const STAGES = [
   "searching",
@@ -29,6 +32,7 @@ const STAGE_LABELS = {
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 const HISTORY_KEY = "research_history_v1";
+const SOUND_KEY = "research_sound_enabled";
 const MAX_HISTORY = 10;
 
 export default function App() {
@@ -42,9 +46,38 @@ export default function App() {
   const [toasts, setToasts] = useState([]);
   const [cameFromCache, setCameFromCache] = useState(false);
 
+  /* Sound state */
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const stored = localStorage.getItem(SOUND_KEY);
+    return stored === null ? true : stored === "true";
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SOUND_KEY, String(soundEnabled));
+    } catch {
+      /* ignore */
+    }
+  }, [soundEnabled]);
+
+  const toggleSound = () => setSoundEnabled((s) => !s);
+
+  const playSound = useCallback(
+    (name) => {
+      if (!soundEnabled) return;
+      try {
+        sounds[name]?.();
+      } catch {
+        /* ignore */
+      }
+    },
+    [soundEnabled],
+  );
+
   const inputRef = useRef(null);
 
-  /* ------------------ Theme ------------------ */
+  /* Theme */
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "light";
     const stored = localStorage.getItem("theme");
@@ -56,12 +89,16 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("theme", theme);
+    try {
+      localStorage.setItem("theme", theme);
+    } catch {
+      /* ignore */
+    }
   }, [theme]);
 
   const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
 
-  /* ------------------ Toasts ------------------ */
+  /* Toasts */
   const pushToast = useCallback((message, type = "info") => {
     const id = Date.now() + Math.random();
     setToasts((t) => [...t, { id, message, type }]);
@@ -70,29 +107,29 @@ export default function App() {
     }, 3200);
   }, []);
 
-  /* ------------------ Keyboard ------------------ */
+  /* Keyboard shortcuts */
   useEffect(() => {
     const onKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         inputRef.current?.focus();
       }
-      if (e.key === "Escape") {
-        inputRef.current?.blur();
-      }
+      if (e.key === "Escape") inputRef.current?.blur();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  /* ------------------ History ------------------ */
+  /* History */
   const addToHistory = useCallback((t) => {
     setHistory((h) => {
       const filtered = h.filter((x) => x.toLowerCase() !== t.toLowerCase());
       const next = [t, ...filtered].slice(0, MAX_HISTORY);
       try {
         localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
-      } catch {}
+      } catch {
+        /* ignore */
+      }
       return next;
     });
   }, []);
@@ -101,11 +138,13 @@ export default function App() {
     setHistory([]);
     try {
       localStorage.removeItem(HISTORY_KEY);
-    } catch {}
+    } catch {
+      /* ignore */
+    }
     pushToast("History cleared", "info");
   }, [pushToast]);
 
-  /* ------------------ Events ------------------ */
+  /* Pipeline state */
   const reset = () => {
     setCurrentStage(null);
     setCompleted({});
@@ -131,8 +170,10 @@ export default function App() {
         });
         setCurrentStage("done");
         pushToast("Loaded from cache", "success");
+        playSound("done");
         return;
       }
+
       if (stage === "final") {
         setResult(evt.result);
         if (evt.result?.errors?.length) {
@@ -146,26 +187,41 @@ export default function App() {
         }
         return;
       }
+
       if (stage === "fatal") {
         setErrors((e) => [...e, evt.message || "Fatal error"]);
         pushToast("Pipeline failed", "error");
-        return;
-      }
-      if (stage === "error") {
-        setErrors((e) => [...e, evt.message || "Pipeline error"]);
+        playSound("error");
         return;
       }
 
-      if (status === "running") setCurrentStage(stage);
+      if (stage === "error") {
+        setErrors((e) => [...e, evt.message || "Pipeline error"]);
+        playSound("error");
+        return;
+      }
+
+      if (status === "running") {
+        setCurrentStage(stage);
+        return;
+      }
+
       if (status === "done") {
         setCompleted((c) => ({ ...c, [stage]: true }));
         setCurrentStage(stage === "done" ? "done" : stage);
+
+        if (stage === "searching") playSound("search");
+        else if (stage === "reading") playSound("read");
+        else if (stage === "writing") playSound("write");
+        else if (stage === "verifying") playSound("verify");
+        else if (stage === "critiquing") playSound("critique");
+        else if (stage === "done") playSound("done");
       }
     },
-    [pushToast],
+    [pushToast, playSound],
   );
 
-  /* ------------------ Pipeline ------------------ */
+  /* Run pipeline */
   const runPipeline = useCallback(
     async (t) => {
       reset();
@@ -214,25 +270,32 @@ export default function App() {
         const msg = String(err.message || err);
         setErrors((e) => [...e, msg]);
         pushToast(msg, "error");
+        playSound("error");
       } finally {
         setRunning(false);
       }
     },
-    [addToHistory, handleEvent, pushToast],
+    [addToHistory, handleEvent, pushToast, playSound],
   );
 
   const handleSubmit = (t) => {
+    // Unlock audio on this user gesture
+    warmup();
     setTopic(t);
     runPipeline(t);
   };
 
-  /* ------------------ Render ------------------ */
   return (
     <>
-      <div className="bg-orbs" aria-hidden="true" />
+      <AuroraBackground />
 
       <div className="app">
-        <TopBar theme={theme} onToggleTheme={toggleTheme} />
+        <TopBar
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          soundEnabled={soundEnabled}
+          onToggleSound={toggleSound}
+        />
 
         <section className="hero">
           <span className="hero-badge">Multi-agent pipeline</span>
@@ -268,6 +331,8 @@ export default function App() {
             completed={completed}
           />
         )}
+
+        {running && <GameAgent />}
 
         {errors.length > 0 && (
           <div className="errors">
