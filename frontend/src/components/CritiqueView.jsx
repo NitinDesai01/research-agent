@@ -4,23 +4,25 @@ export default function CritiqueView({ critique }) {
   return (
     <div className="scorecard">
       <div className="overall-score">
-        <span className="num">{parsed.overall ?? "?"}</span>
-        <span className="out-of">/ 10</span>
-        <span className="label">Overall Score</span>
+        <div className="score-number">{parsed.overall ?? "?"}</div>
+        <div className="score-meta">
+          <div className="score-out-of">/ 10</div>
+          <div className="score-label">Overall Score</div>
+        </div>
       </div>
 
       {parsed.subScores.length > 0 && (
         <div style={{ display: "grid", gap: 12 }}>
           {parsed.subScores.map((s) => (
             <div className="subscore" key={s.label}>
-              <span className="label">{s.label}</span>
+              <span className="subscore-label">{s.label}</span>
               <div className="bar">
                 <div
                   className="bar-fill"
                   style={{ width: `${(s.value / 10) * 100}%` }}
                 />
               </div>
-              <span className="value">{s.value}/10</span>
+              <span className="subscore-value">{s.value}/10</span>
             </div>
           ))}
         </div>
@@ -29,7 +31,7 @@ export default function CritiqueView({ critique }) {
       {parsed.strengths.length > 0 && (
         <div className="critique-section">
           <h4>Strengths</h4>
-          <ul>
+          <ul className="critique-list">
             {parsed.strengths.map((s, i) => (
               <li key={i}>{s}</li>
             ))}
@@ -40,7 +42,7 @@ export default function CritiqueView({ critique }) {
       {parsed.improvements.length > 0 && (
         <div className="critique-section">
           <h4>Areas to Improve</h4>
-          <ul>
+          <ul className="critique-list">
             {parsed.improvements.map((s, i) => (
               <li key={i}>{s}</li>
             ))}
@@ -62,11 +64,12 @@ export default function CritiqueView({ critique }) {
         </div>
       )}
 
-      {parsed.verdict && <div className="verdict">“{parsed.verdict}”</div>}
+      {parsed.verdict && <div className="verdict">"{parsed.verdict}"</div>}
     </div>
   );
 }
 
+/* Parsing logic unchanged from previous version */
 function parseCritique(text) {
   const out = {
     overall: null,
@@ -80,7 +83,7 @@ function parseCritique(text) {
   if (!text) return out;
 
   const overallMatch = text.match(
-    /OVERALL SCORE:\s*(\d+(?:\.\d+)?)\s*\/\s*10/i
+    /OVERALL SCORE:\s*(\d+(?:\.\d+)?)\s*\/\s*10/i,
   );
   if (overallMatch) out.overall = parseFloat(overallMatch[1]);
 
@@ -105,7 +108,7 @@ function parseCritique(text) {
       "MAJOR EVIDENCE PROBLEM:",
       "RECOMMENDED IMPROVEMENT:",
       "VERDICT:",
-    ])
+    ]),
   );
 
   out.improvements = bullets(
@@ -113,21 +116,20 @@ function parseCritique(text) {
       "MAJOR EVIDENCE PROBLEM:",
       "RECOMMENDED IMPROVEMENT:",
       "VERDICT:",
-    ])
+    ]),
   );
 
-  out.majorProblem =
-    (
-      section(text, "MAJOR EVIDENCE PROBLEM:", [
-        "RECOMMENDED IMPROVEMENT:",
-        "VERDICT:",
-      ]) || ""
-    ).trim() || "";
+  out.majorProblem = (
+    section(text, "MAJOR EVIDENCE PROBLEM:", [
+      "RECOMMENDED IMPROVEMENT:",
+      "VERDICT:",
+    ]) || ""
+  ).trim();
 
-  out.recommendation =
-    (section(text, "RECOMMENDED IMPROVEMENT:", ["VERDICT:"]) || "").trim() || "";
-
-  out.verdict = (section(text, "VERDICT:", []) || "").trim() || "";
+  out.recommendation = (
+    section(text, "RECOMMENDED IMPROVEMENT:", ["VERDICT:"]) || ""
+  ).trim();
+  out.verdict = (section(text, "VERDICT:", []) || "").trim();
 
   return out;
 }

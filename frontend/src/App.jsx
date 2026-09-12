@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import TopicForm from "./components/TopicForm.jsx";
 import PipelineStepper from "./components/PipelineStepper.jsx";
 import ReportView from "./components/ReportView.jsx";
@@ -6,8 +6,18 @@ import CritiqueView from "./components/CritiqueView.jsx";
 import SourcesView from "./components/SourcesView.jsx";
 import VerificationView from "./components/VerificationView.jsx";
 import Panel from "./components/Panel.jsx";
+import TopBar from "./components/TopBar.jsx";
+import Toast from "./components/Toast.jsx";
+import History from "./components/History.jsx";
 
-const STAGES = ["searching", "reading", "writing", "verifying", "critiquing", "done"];
+const STAGES = [
+  "searching",
+  "reading",
+  "writing",
+  "verifying",
+  "critiquing",
+  "done",
+];
 const STAGE_LABELS = {
   searching: "Search",
   reading: "Read",
@@ -18,6 +28,8 @@ const STAGE_LABELS = {
 };
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
+const HISTORY_KEY = "research_history_v1";
+const MAX_HISTORY = 10;
 
 export default function App() {
   const [topic, setTopic] = useState("");
@@ -26,57 +38,139 @@ export default function App() {
   const [completed, setCompleted] = useState({});
   const [result, setResult] = useState(null);
   const [errors, setErrors] = useState([]);
+  const [history, setHistory] = useState(() => loadHistory());
+  const [toasts, setToasts] = useState([]);
+  const [cameFromCache, setCameFromCache] = useState(false);
 
+  const inputRef = useRef(null);
+
+  /* ------------------ Theme ------------------ */
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === "undefined") return "light";
+    const stored = localStorage.getItem("theme");
+    if (stored) return stored;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
+
+  /* ------------------ Toasts ------------------ */
+  const pushToast = useCallback((message, type = "info") => {
+    const id = Date.now() + Math.random();
+    setToasts((t) => [...t, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((t) => t.filter((x) => x.id !== id));
+    }, 3200);
+  }, []);
+
+  /* ------------------ Keyboard ------------------ */
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+      if (e.key === "Escape") {
+        inputRef.current?.blur();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  /* ------------------ History ------------------ */
+  const addToHistory = useCallback((t) => {
+    setHistory((h) => {
+      const filtered = h.filter((x) => x.toLowerCase() !== t.toLowerCase());
+      const next = [t, ...filtered].slice(0, MAX_HISTORY);
+      try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  const clearHistory = useCallback(() => {
+    setHistory([]);
+    try {
+      localStorage.removeItem(HISTORY_KEY);
+    } catch {}
+    pushToast("History cleared", "info");
+  }, [pushToast]);
+
+  /* ------------------ Events ------------------ */
   const reset = () => {
     setCurrentStage(null);
     setCompleted({});
     setResult(null);
     setErrors([]);
+    setCameFromCache(false);
   };
 
-  const handleEvent = useCallback((evt) => {
-    const { stage, status } = evt;
+  const handleEvent = useCallback(
+    (evt) => {
+      const { stage, status } = evt;
 
-    if (stage === "cached") {
-      setResult(evt.result);
-      setCompleted({
-        searching: true,
-        reading: true,
-        writing: true,
-        verifying: true,
-        critiquing: true,
-        done: true,
-      });
-      setCurrentStage("done");
-      return;
-    }
-    if (stage === "final") {
-      setResult(evt.result);
-      if (evt.result?.errors?.length) {
-        setErrors((e) => [...e, ...evt.result.errors]);
+      if (stage === "cached") {
+        setResult(evt.result);
+        setCameFromCache(true);
+        setCompleted({
+          searching: true,
+          reading: true,
+          writing: true,
+          verifying: true,
+          critiquing: true,
+          done: true,
+        });
+        setCurrentStage("done");
+        pushToast("Loaded from cache", "success");
+        return;
       }
-      return;
-    }
-    if (stage === "fatal") {
-      setErrors((e) => [...e, evt.message || "Fatal error"]);
-      return;
-    }
-    if (stage === "error") {
-      setErrors((e) => [...e, evt.message || "Pipeline error"]);
-      return;
-    }
+      if (stage === "final") {
+        setResult(evt.result);
+        if (evt.result?.errors?.length) {
+          setErrors((e) => [...e, ...evt.result.errors]);
+          pushToast(
+            `Completed with ${evt.result.errors.length} warning(s)`,
+            "info",
+          );
+        } else {
+          pushToast("Research complete", "success");
+        }
+        return;
+      }
+      if (stage === "fatal") {
+        setErrors((e) => [...e, evt.message || "Fatal error"]);
+        pushToast("Pipeline failed", "error");
+        return;
+      }
+      if (stage === "error") {
+        setErrors((e) => [...e, evt.message || "Pipeline error"]);
+        return;
+      }
 
-    if (status === "running") setCurrentStage(stage);
-    if (status === "done") {
-      setCompleted((c) => ({ ...c, [stage]: true }));
-      setCurrentStage(stage === "done" ? "done" : stage);
-    }
-  }, []);
+      if (status === "running") setCurrentStage(stage);
+      if (status === "done") {
+        setCompleted((c) => ({ ...c, [stage]: true }));
+        setCurrentStage(stage === "done" ? "done" : stage);
+      }
+    },
+    [pushToast],
+  );
 
+  /* ------------------ Pipeline ------------------ */
   const runPipeline = useCallback(
     async (t) => {
       reset();
       setRunning(true);
+      addToHistory(t);
 
       try {
         const resp = await fetch(`${API_BASE}/research/stream`, {
@@ -117,12 +211,14 @@ export default function App() {
           }
         }
       } catch (err) {
-        setErrors((e) => [...e, String(err.message || err)]);
+        const msg = String(err.message || err);
+        setErrors((e) => [...e, msg]);
+        pushToast(msg, "error");
       } finally {
         setRunning(false);
       }
     },
-    [handleEvent]
+    [addToHistory, handleEvent, pushToast],
   );
 
   const handleSubmit = (t) => {
@@ -130,70 +226,138 @@ export default function App() {
     runPipeline(t);
   };
 
+  /* ------------------ Render ------------------ */
   return (
-    <div className="app">
-      <div className="header">
-        <span className="badge">Multi-Agent Pipeline</span>
-        <h1>
-          <span className="grad">Research Agent</span>
-        </h1>
-        <p>
-          Search → Reader → Writer → Verifier → Critic. Specialized agents
-          collaborate to build, verify, and score a research report on any topic.
-        </p>
+    <>
+      <div className="bg-orbs" aria-hidden="true" />
+
+      <div className="app">
+        <TopBar theme={theme} onToggleTheme={toggleTheme} />
+
+        <section className="hero">
+          <span className="hero-badge">Multi-agent pipeline</span>
+          <h1>
+            <span className="gradient">Research Agent</span>
+          </h1>
+          <p>
+            Search <span className="inline-icon">→</span> Reader
+            <span className="inline-icon">→</span> Writer
+            <span className="inline-icon">→</span> Verifier
+            <span className="inline-icon">→</span> Critic
+            <br />
+            Specialized AI agents collaborate to build, verify, and score a
+            research report on any topic.
+          </p>
+        </section>
+
+        <TopicForm ref={inputRef} onSubmit={handleSubmit} disabled={running} />
+
+        {history.length > 0 && !running && !result && (
+          <History
+            items={history}
+            onSelect={handleSubmit}
+            onClear={clearHistory}
+          />
+        )}
+
+        {currentStage && (
+          <PipelineStepper
+            stages={STAGES}
+            labels={STAGE_LABELS}
+            current={currentStage}
+            completed={completed}
+          />
+        )}
+
+        {errors.length > 0 && (
+          <div className="errors">
+            <strong>Pipeline warnings</strong>
+            <ul>
+              {errors.map((e, i) => (
+                <li key={i}>{e}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {result?.report && (
+          <Panel
+            title="Research Report"
+            icon="document"
+            meta={
+              cameFromCache
+                ? "cached"
+                : `${readingTime(result.report)} min read`
+            }
+            defaultOpen
+          >
+            <ReportView
+              report={result.report}
+              topic={result.topic}
+              onToast={pushToast}
+            />
+          </Panel>
+        )}
+
+        {result?.verification && (
+          <Panel title="Citation Verification" icon="shield" defaultOpen>
+            <VerificationView verification={result.verification} />
+          </Panel>
+        )}
+
+        {result?.critique && (
+          <Panel title="Critic Scorecard" icon="target" defaultOpen>
+            <CritiqueView critique={result.critique} />
+          </Panel>
+        )}
+
+        {result?.sources?.length > 0 && (
+          <Panel
+            title="Sources"
+            icon="link"
+            meta={`${result.sources.length} references`}
+            defaultOpen={false}
+          >
+            <SourcesView sources={result.sources} />
+          </Panel>
+        )}
+
+        {result?.reader_notes && (
+          <Panel title="Reader Notes" icon="notes" defaultOpen={false}>
+            <div className="notes">{result.reader_notes}</div>
+          </Panel>
+        )}
+
+        <div className="footer">
+          Built with FastAPI, LangChain, Groq &amp; Tavily ·{" "}
+          <a
+            href="https://github.com/NitinDesai01/research-agent"
+            target="_blank"
+            rel="noreferrer"
+          >
+            View source
+          </a>
+        </div>
       </div>
 
-      <TopicForm onSubmit={handleSubmit} disabled={running} />
-
-      {currentStage && (
-        <PipelineStepper
-          stages={STAGES}
-          labels={STAGE_LABELS}
-          current={currentStage}
-          completed={completed}
-        />
-      )}
-
-      {errors.length > 0 && (
-        <div className="errors">
-          <strong>Pipeline warnings</strong>
-          <ul>
-            {errors.map((e, i) => (
-              <li key={i}>{e}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {result?.report && (
-        <Panel title="Research Report" defaultOpen>
-          <ReportView report={result.report} topic={result.topic} />
-        </Panel>
-      )}
-
-      {result?.verification && (
-        <Panel title="Citation Verification" defaultOpen>
-          <VerificationView verification={result.verification} />
-        </Panel>
-      )}
-
-      {result?.critique && (
-        <Panel title="Critic Scorecard" defaultOpen>
-          <CritiqueView critique={result.critique} />
-        </Panel>
-      )}
-
-      {result?.sources?.length > 0 && (
-        <Panel title="Sources" defaultOpen={false}>
-          <SourcesView sources={result.sources} />
-        </Panel>
-      )}
-
-      {result?.reader_notes && (
-        <Panel title="Reader Notes" defaultOpen={false}>
-          <div className="notes">{result.reader_notes}</div>
-        </Panel>
-      )}
-    </div>
+      <Toast toasts={toasts} />
+    </>
   );
+}
+
+/* ------------------ Helpers ------------------ */
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.slice(0, MAX_HISTORY) : [];
+  } catch {
+    return [];
+  }
+}
+
+function readingTime(md) {
+  const words = (md || "").split(/\s+/).length;
+  return Math.max(1, Math.round(words / 220));
 }
