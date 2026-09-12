@@ -68,21 +68,43 @@ def run_pipeline(topic: str, progress_cb=None) -> Dict[str, Any]:
         emit("error", message="No search results found.")
         return result
 
-    # --- 2. Scrape one source -------------------------------------------
-    chosen = result["search_results"][0]
+    # --- 2. Scrape: try multiple sources until one succeeds --------------
+    emit("reading", status="running")
+    chosen = None
+    scraped = ""
+    failed_urls = []
+
+    for candidate in result["search_results"]:
+        url = candidate["url"]
+        try:
+            text = scrape_url(url)
+            if text and len(text.strip()) > 400:
+                chosen = candidate
+                scraped = text
+                break
+            else:
+                failed_urls.append(f"{url} (too little content)")
+        except Exception as exc:  # noqa: BLE001
+            failed_urls.append(f"{url} ({exc})")
+
+    if failed_urls:
+        result["errors"].append(
+            "Some sources could not be scraped: " + "; ".join(failed_urls)
+        )
+
+    if not chosen:
+        # Fall back to the source with the longest snippet
+        chosen = max(
+            result["search_results"],
+            key=lambda r: len(r.get("content", "")),
+        )
+        scraped = chosen.get("content", "")
+        result["errors"].append(
+            "Could not scrape any source — using search snippets only."
+        )
+
     result["scraped_url"] = chosen["url"]
     emit("reading", status="running", url=chosen["url"])
-
-    scraped = ""
-    try:
-        scraped = scrape_url(chosen["url"])
-    except Exception as exc:  # noqa: BLE001
-        result["errors"].append(f"Scrape failed for {chosen['url']}: {exc}")
-
-    if not scraped:
-        scraped = chosen.get("content", "")
-        if not scraped:
-            result["errors"].append("No content available to read.")
 
     # --- 3. Reader Agent -------------------------------------------------
     reader_notes = ""

@@ -126,6 +126,10 @@ WRITER_PROMPT = ChatPromptTemplate.from_messages(
             """You are a Writer Agent. Produce a structured Markdown research
 report using ONLY the provided research evidence.
 
+IMPORTANT: If the evidence is thin (mostly short snippets, no full articles),
+say so explicitly in the Introduction and Limitations sections. Do NOT invent
+details to fill gaps. Prefer an honest shorter report over a padded one.
+
 Hard rules:
 - Do NOT invent facts, statistics, URLs, or sources.
 - Do NOT use Markdown tables.
