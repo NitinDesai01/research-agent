@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+requests
+beautifulsoup4
+tavily-python
+langchain
+langchain-core
+langchain-classic
+langchain-groq
+redis
+slowapi
