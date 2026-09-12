@@ -53,7 +53,7 @@ def web_search(query: str) -> List[Dict[str, str]]:
 
 
 def scrape_url(url: str) -> str:
-    """Fetch a URL and return cleaned readable text (capped)."""
+    """Fetch a URL directly with requests and return cleaned readable text."""
     try:
         resp = requests.get(url, headers=_HEADERS, timeout=15)
         resp.raise_for_status()
@@ -75,3 +75,26 @@ def scrape_url(url: str) -> str:
         cleaned = cleaned[:_MAX_SCRAPE_CHARS] + "\n\n[...truncated...]"
 
     return cleaned
+
+
+def tavily_extract(url: str) -> str:
+    """Extract page content via Tavily's own crawler.
+
+    Bypasses most 403 blocks because Tavily fetches from permitted IPs.
+    """
+    if not TAVILY_API_KEY:
+        raise RuntimeError("TAVILY_API_KEY is not set.")
+    client = TavilyClient(api_key=TAVILY_API_KEY)
+    try:
+        response = client.extract(urls=[url])
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f"Tavily extract failed for {url}: {exc}") from exc
+
+    results = response.get("results", []) if isinstance(response, dict) else []
+    if not results:
+        raise RuntimeError(f"Tavily returned no content for {url}")
+
+    content = results[0].get("raw_content") or ""
+    if len(content) > _MAX_SCRAPE_CHARS:
+        content = content[:_MAX_SCRAPE_CHARS] + "\n\n[...truncated...]"
+    return content

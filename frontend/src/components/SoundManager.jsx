@@ -1,6 +1,9 @@
 /**
  * SoundManager — synthesizes soft UI chimes via Web Audio API.
  * No external audio files required.
+ *
+ * IMPORTANT: browsers suspend AudioContext until a user gesture.
+ * Call `warmup()` from the first click handler to unlock playback.
  */
 let audioCtx = null;
 
@@ -13,7 +16,6 @@ function getCtx() {
       return null;
     }
   }
-  // Some browsers suspend the context until user interaction
   if (audioCtx.state === "suspended") {
     audioCtx.resume().catch(() => {});
   }
@@ -21,12 +23,27 @@ function getCtx() {
 }
 
 /**
+ * Call this ONCE from a user click handler (e.g., the Research button).
+ * It creates and resumes the AudioContext so subsequent chimes can play.
+ */
+export function warmup() {
+  const ctx = getCtx();
+  if (!ctx) return;
+  try {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    g.gain.value = 0.0001;
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.02);
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
  * Play a soft two-note chime.
- * @param {object} opts
- * @param {number[]} opts.freqs - Frequencies (Hz) to play in sequence
- * @param {number} opts.duration - Duration of each note in seconds
- * @param {number} opts.gain - Volume (0..1)
- * @param {"sine"|"triangle"} opts.type - Waveform
  */
 export function playChime({
   freqs = [660, 880],
@@ -45,7 +62,6 @@ export function playChime({
     osc.type = type;
     osc.frequency.value = f;
 
-    // Envelope: quick attack, gentle decay
     const start = now + i * duration * 0.85;
     const end = start + duration * 1.6;
 
@@ -61,13 +77,13 @@ export function playChime({
   });
 }
 
-/* Predefined sounds */
 export const sounds = {
   search: () => playChime({ freqs: [523.25, 659.25], gain: 0.07 }),
-  read:   () => playChime({ freqs: [587.33, 783.99], gain: 0.07 }),
-  write:  () => playChime({ freqs: [659.25, 880.00], gain: 0.08 }),
+  read: () => playChime({ freqs: [587.33, 783.99], gain: 0.07 }),
+  write: () => playChime({ freqs: [659.25, 880.0], gain: 0.08 }),
   verify: () => playChime({ freqs: [698.46, 932.33], gain: 0.07 }),
   critique: () => playChime({ freqs: [783.99, 1046.5], gain: 0.08 }),
-  done:   () => playChime({ freqs: [659.25, 880.00, 1174.66], gain: 0.09, duration: 0.16 }),
-  error:  () => playChime({ freqs: [220, 165], gain: 0.08, type: "triangle" }),
+  done: () =>
+    playChime({ freqs: [659.25, 880.0, 1174.66], gain: 0.09, duration: 0.16 }),
+  error: () => playChime({ freqs: [220, 165], gain: 0.08, type: "triangle" }),
 };

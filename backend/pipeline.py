@@ -10,7 +10,7 @@ from agents import (
     build_writer_chain,
     build_critic_chain,
 )
-from tools import web_search, scrape_url
+from tools import web_search, scrape_url, tavily_extract
 from verifier import build_verifier_chain
 
 _URL_RE = re.compile(r"https?://[^\s\)\]\>\"']+")
@@ -68,7 +68,7 @@ def run_pipeline(topic: str, progress_cb=None) -> Dict[str, Any]:
         emit("error", message="No search results found.")
         return result
 
-    # --- 2. Scrape: try multiple sources until one succeeds --------------
+    # --- 2. Scrape: try Tavily extract first, then direct requests -------
     emit("reading", status="running")
     chosen = None
     scraped = ""
@@ -76,6 +76,18 @@ def run_pipeline(topic: str, progress_cb=None) -> Dict[str, Any]:
 
     for candidate in result["search_results"]:
         url = candidate["url"]
+
+        # Strategy A: Tavily's own crawler (bypasses most 403s)
+        try:
+            text = tavily_extract(url)
+            if text and len(text.strip()) > 400:
+                chosen = candidate
+                scraped = text
+                break
+        except Exception:
+            pass  # silently fall through to Strategy B
+
+        # Strategy B: plain requests + BeautifulSoup
         try:
             text = scrape_url(url)
             if text and len(text.strip()) > 400:
@@ -87,9 +99,14 @@ def run_pipeline(topic: str, progress_cb=None) -> Dict[str, Any]:
         except Exception as exc:  # noqa: BLE001
             failed_urls.append(f"{url} ({exc})")
 
-    if failed_urls:
+    if failed_urls and not chosen:
         result["errors"].append(
             "Some sources could not be scraped: " + "; ".join(failed_urls)
+        )
+    elif failed_urls:
+        result["errors"].append(
+            f"Skipped {len(failed_urls)} inaccessible source(s); "
+            "used a working one."
         )
 
     if not chosen:
@@ -182,20 +199,46 @@ def run_pipeline(topic: str, progress_cb=None) -> Dict[str, Any]:
 
 
 def _parse_search_output(text: str) -> List[Dict[str, str]]:
-    """Best-effort parse of an agent's text output into structured results."""
-    results: List[Dict[str, str]] = []
+    """Best-effort parse of an agent's text output into structured results.
+
+    Strategy 1: split on `[N]` numbered blocks (the expected format).
+    Strategy 2: if that yields fewer than 2 results, extract every URL
+                and build structured entries around each one.
+    """
     if not text:
-        return results
+        return []
+
+    results: List[Dict[str, str]] = []
+
+    # --- Strategy 1: parse [N] Title / URL / Snippet blocks --------------
     blocks = re.split(r"\n(?=\[\d+\])", text.strip())
     for block in blocks:
         url_match = _URL_RE.search(block)
         if not url_match:
             continue
-        url = url_match.group(0).rstrip(".,);")
+        url = url_match.group(0).rstrip(".,);]")
         title_match = re.match(r"\[\d+\]\s*(.*)", block)
         title = title_match.group(1).strip() if title_match else url
-        snippet = (
-            block.split("Snippet:", 1)[-1].strip() if "Snippet:" in block else ""
-        )
+        snippet = ""
+        if "Snippet:" in block:
+            snippet = block.split("Snippet:", 1)[-1].strip()
+        elif "URL:" in block:
+            after_url = block.split("URL:", 1)[-1]
+            lines = after_url.splitlines()
+            snippet = " ".join(l.strip() for l in lines[1:] if l.strip())
         results.append({"title": title, "url": url, "content": snippet})
+
+    # --- Strategy 2: fall back to raw URL extraction ---------------------
+    if len(results) < 2:
+        all_urls = list(dict.fromkeys(_URL_RE.findall(text)))
+        results = []
+        for url in all_urls:
+            clean_url = url.rstrip(".,);]")
+            idx = text.find(url)
+            ctx = text[idx + len(url): idx + len(url) + 400].strip()
+            ctx = re.sub(r"\s+", " ", ctx)[:300]
+            results.append(
+                {"title": clean_url, "url": clean_url, "content": ctx}
+            )
+
     return results
