@@ -37,7 +37,7 @@ Open http://localhost:5173
 
 ## Environment variables
 
-- GROQ_API_KEY  - from https://console.groq.com
+- GROQ_API_KEY - from https://console.groq.com
 - TAVILY_API_KEY - from https://tavily.com
 - ALLOWED_ORIGINS - frontend URL for CORS
 - REDIS_URL - optional, for caching

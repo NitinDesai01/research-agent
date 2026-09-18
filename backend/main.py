@@ -1,4 +1,4 @@
-"""FastAPI app exposing the research pipeline with SSE progress streaming."""
+"""FastAPI app: research pipeline + auth + saved reports + follow-up chat."""
 from __future__ import annotations
 
 import asyncio
@@ -19,16 +19,15 @@ from slowapi.errors import RateLimitExceeded
 from cache import cache_get, cache_set
 from pipeline import run_pipeline
 from rate_limit import limiter, RESEARCH_RATE_LIMIT
+from reports_api import router as reports_router
 
 load_dotenv()
 
 app = FastAPI(title="Multi-Agent Research API")
 
-# Rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS — allow local dev and any Vercel preview/production deployment
 _ALLOWED = os.getenv(
     "ALLOWED_ORIGINS",
     "http://localhost:5173,http://localhost:3000",
@@ -43,9 +42,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Register saved reports router
+app.include_router(reports_router)
+
 
 class ResearchRequest(BaseModel):
     topic: str
+
+
+class ChatRequest(BaseModel):
+    topic: str
+    report: str
+    question: str
 
 
 @app.get("/health")
@@ -56,8 +64,6 @@ def health():
 @app.post("/research/stream")
 @limiter.limit(RESEARCH_RATE_LIMIT)
 async def research_stream(request: Request, req: ResearchRequest):
-    """Stream pipeline progress as Server-Sent Events."""
-    # Cache check
     cached = await cache_get(req.topic)
     if cached:
         async def cached_gen():
@@ -72,7 +78,6 @@ async def research_stream(request: Request, req: ResearchRequest):
     def worker():
         try:
             final = run_pipeline(req.topic, progress_cb=progress_cb)
-            # Cache the result asynchronously
             try:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
@@ -84,7 +89,7 @@ async def research_stream(request: Request, req: ResearchRequest):
         except Exception as exc:  # noqa: BLE001
             queue.put(json.dumps({"stage": "fatal", "message": str(exc)}))
         finally:
-            queue.put(None)  # sentinel
+            queue.put(None)
 
     Thread(target=worker, daemon=True).start()
 
@@ -105,3 +110,42 @@ async def research_stream(request: Request, req: ResearchRequest):
             "Connection": "keep-alive",
         },
     )
+
+
+@app.post("/chat")
+@limiter.limit("30/hour")
+async def chat(request: Request, req: ChatRequest):
+    """Answer follow-up questions using the existing report as context."""
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.output_parsers import StrOutputParser
+    from agents import _llm
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """You are a research assistant. Answer the user's question
+using ONLY the provided report. If the report doesn't contain the answer,
+say so honestly — do not invent facts.""",
+            ),
+            (
+                "human",
+                "TOPIC: {topic}\n\nREPORT:\n{report}\n\nQUESTION: {question}",
+            ),
+        ]
+    )
+    chain = prompt | _llm() | StrOutputParser()
+
+    try:
+        answer = await asyncio.to_thread(
+            chain.invoke,
+            {
+                "topic": req.topic,
+                "report": req.report[:8000],
+                "question": req.question,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        answer = f"Error: {exc}"
+
+    return {"answer": answer}

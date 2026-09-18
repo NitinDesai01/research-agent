@@ -1,10 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { playChime } from "./SoundManager.jsx";
 
 const WORDS = [
-  "QUERY", "STUDY", "CLOUD", "BRAIN", "LOGIC",
-  "AGENT", "THEME", "SEARCH", "TOPIC", "PROOF",
-  "NOTES", "DRAFT", "SKILL", "TRUST", "SMART",
-  "FOCUS", "LEARN", "IDEAS", "CLEAR", "SHARP",
+  "QUERY",
+  "STUDY",
+  "CLOUD",
+  "BRAIN",
+  "LOGIC",
+  "AGENT",
+  "THEME",
+  "SEARCH",
+  "TOPIC",
+  "PROOF",
+  "NOTES",
+  "DRAFT",
+  "SKILL",
+  "TRUST",
+  "SMART",
+  "FOCUS",
+  "LEARN",
+  "IDEAS",
+  "CLEAR",
+  "SHARP",
 ];
 
 const MAX_GUESSES = 6;
@@ -19,13 +36,10 @@ function pickWord() {
   return WORDS[Math.floor(Math.random() * WORDS.length)];
 }
 
-/** Evaluate a guess against the answer.
- *  Returns array of "correct" | "present" | "absent" per letter. */
 function evaluate(guess, answer) {
   const result = Array(WORD_LEN).fill("absent");
   const remaining = answer.split("");
 
-  // First pass: exact matches
   guess.split("").forEach((ch, i) => {
     if (ch === answer[i]) {
       result[i] = "correct";
@@ -33,7 +47,6 @@ function evaluate(guess, answer) {
     }
   });
 
-  // Second pass: present-but-wrong-position
   guess.split("").forEach((ch, i) => {
     if (result[i] === "correct") return;
     const idx = remaining.indexOf(ch);
@@ -48,12 +61,11 @@ function evaluate(guess, answer) {
 
 export default function GameAgent({ onComplete }) {
   const [answer, setAnswer] = useState(() => pickWord());
-  const [guesses, setGuesses] = useState([]); // [{word, marks}]
+  const [guesses, setGuesses] = useState([]);
   const [current, setCurrent] = useState("");
-  const [status, setStatus] = useState("playing"); // playing | won | lost
+  const [status, setStatus] = useState("playing");
   const [shake, setShake] = useState(false);
 
-  // Reset the game if the component remounts
   useEffect(() => {
     setAnswer(pickWord());
     setGuesses([]);
@@ -61,7 +73,6 @@ export default function GameAgent({ onComplete }) {
     setStatus("playing");
   }, []);
 
-  // ---- Keyboard handler (physical keyboard) ----
   const handleKey = useCallback(
     (key) => {
       if (status !== "playing") return;
@@ -72,6 +83,14 @@ export default function GameAgent({ onComplete }) {
           setTimeout(() => setShake(false), 400);
           return;
         }
+
+        // Soft tick when tiles flip
+        try {
+          playChime({ freqs: [880], gain: 0.03, duration: 0.06 });
+        } catch {
+          /* ignore */
+        }
+
         const marks = evaluate(current, answer);
         const next = [...guesses, { word: current, marks }];
         setGuesses(next);
@@ -79,9 +98,23 @@ export default function GameAgent({ onComplete }) {
 
         if (current === answer) {
           setStatus("won");
+          try {
+            playChime({
+              freqs: [659.25, 880.0, 1174.66],
+              gain: 0.08,
+              duration: 0.16,
+            });
+          } catch {
+            /* ignore */
+          }
           onComplete?.("won", next.length);
         } else if (next.length >= MAX_GUESSES) {
           setStatus("lost");
+          try {
+            playChime({ freqs: [220, 165], gain: 0.07, type: "triangle" });
+          } catch {
+            /* ignore */
+          }
           onComplete?.("lost", MAX_GUESSES);
         }
         return;
@@ -96,7 +129,7 @@ export default function GameAgent({ onComplete }) {
         setCurrent((c) => c + key);
       }
     },
-    [answer, current, guesses, status, onComplete]
+    [answer, current, guesses, status, onComplete],
   );
 
   useEffect(() => {
@@ -110,13 +143,11 @@ export default function GameAgent({ onComplete }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handleKey]);
 
-  // ---- Which letters are used, and how ----
   const letterState = useMemo(() => {
     const map = {};
     for (const { word, marks } of guesses) {
       word.split("").forEach((ch, i) => {
         const m = marks[i];
-        // Prefer "correct" over "present" over "absent"
         if (map[ch] === "correct") return;
         if (map[ch] === "present" && m !== "correct") return;
         map[ch] = m;
@@ -132,7 +163,6 @@ export default function GameAgent({ onComplete }) {
     setStatus("playing");
   };
 
-  // ---- Render ----
   const rows = [];
   for (let i = 0; i < MAX_GUESSES; i++) {
     const g = guesses[i];
@@ -140,9 +170,11 @@ export default function GameAgent({ onComplete }) {
       rows.push(
         <div className="game-row" key={i}>
           {g.word.split("").map((ch, j) => (
-            <div className={`game-tile ${g.marks[j]}`} key={j}>{ch}</div>
+            <div className={`game-tile ${g.marks[j]}`} key={j}>
+              {ch}
+            </div>
           ))}
-        </div>
+        </div>,
       );
     } else if (i === guesses.length && status === "playing") {
       const chars = current.padEnd(WORD_LEN, " ").split("");
@@ -153,15 +185,17 @@ export default function GameAgent({ onComplete }) {
               {ch.trim()}
             </div>
           ))}
-        </div>
+        </div>,
       );
     } else {
       rows.push(
         <div className="game-row" key={i}>
-          {Array(WORD_LEN).fill(null).map((_, j) => (
-            <div className="game-tile" key={j} />
-          ))}
-        </div>
+          {Array(WORD_LEN)
+            .fill(null)
+            .map((_, j) => (
+              <div className="game-tile" key={j} />
+            ))}
+        </div>,
       );
     }
   }
@@ -186,7 +220,9 @@ export default function GameAgent({ onComplete }) {
       <p className="game-hint">
         Guess the 5-letter word in {MAX_GUESSES} tries.
         <br />
-        <span className="game-hint-keys">Type letters · Enter to submit · Backspace to delete</span>
+        <span className="game-hint-keys">
+          Type letters · Enter to submit · Backspace to delete
+        </span>
       </p>
 
       <div className="game-board">{rows}</div>
@@ -214,14 +250,19 @@ export default function GameAgent({ onComplete }) {
 
       {status === "won" && (
         <div className="game-result win">
-          🎉 Solved in {guesses.length} {guesses.length === 1 ? "try" : "tries"}!
-          <button type="button" onClick={reset}>Play again</button>
+          🎉 Solved in {guesses.length} {guesses.length === 1 ? "try" : "tries"}
+          !
+          <button type="button" onClick={reset}>
+            Play again
+          </button>
         </div>
       )}
       {status === "lost" && (
         <div className="game-result lose">
           The word was <strong>{answer}</strong>.
-          <button type="button" onClick={reset}>Play again</button>
+          <button type="button" onClick={reset}>
+            Play again
+          </button>
         </div>
       )}
     </div>

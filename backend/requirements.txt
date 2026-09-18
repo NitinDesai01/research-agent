@@ -11,3 +11,6 @@ langchain-classic
 langchain-groq
 redis
 slowapi
+clerk-backend-api
+psycopg[binary]
+sqlalchemy
