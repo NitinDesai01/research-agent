@@ -2120,7 +2120,8 @@ body {
   gap: 20px;
 }
 
-.suggestion-group { }
+.suggestion-group {
+}
 
 .suggestion-category {
   font-size: 0.7rem;
@@ -2157,7 +2158,10 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
-.suggestion-chip:disabled { opacity: 0.5; cursor: not-allowed; }
+.suggestion-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* =========================================================
    Table of contents
@@ -2169,7 +2173,9 @@ body {
   align-items: start;
 }
 
-.report-main { min-width: 0; }
+.report-main {
+  min-width: 0;
+}
 
 .toc {
   position: sticky;
@@ -2228,14 +2234,23 @@ body {
 }
 
 @media (max-width: 1000px) {
-  .report-layout { grid-template-columns: 1fr; }
-  .toc { position: relative; top: 0; max-height: none; }
+  .report-layout {
+    grid-template-columns: 1fr;
+  }
+  .toc {
+    position: relative;
+    top: 0;
+    max-height: none;
+  }
 }
 
 /* =========================================================
    Skeleton loading
    ========================================================= */
-.skeleton-panel { pointer-events: none; opacity: 0.85; }
+.skeleton-panel {
+  pointer-events: none;
+  opacity: 0.85;
+}
 
 .skeleton-box {
   display: inline-block;
@@ -2266,12 +2281,170 @@ body {
   margin-bottom: 10px;
 }
 
-.skeleton-title { width: 40%; height: 14px; }
-.skeleton-lg { width: 100%; }
-.skeleton-md { width: 80%; }
-.skeleton-sm { width: 55%; }
+.skeleton-title {
+  width: 40%;
+  height: 14px;
+}
+.skeleton-lg {
+  width: 100%;
+}
+.skeleton-md {
+  width: 80%;
+}
+.skeleton-sm {
+  width: 55%;
+}
 
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+/* =========================================================
+   Paper Writing Guide
+   ========================================================= */
+.paper-guide {
+  display: grid;
+  gap: 22px;
+}
+
+.pg-section {
+  border-left: 3px solid var(--accent);
+  padding-left: 16px;
+}
+
+.pg-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.pg-paragraph {
+  color: var(--text-soft);
+  line-height: 1.65;
+  font-size: 0.93rem;
+}
+
+.pg-list {
+  padding-left: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.pg-list li {
+  position: relative;
+  padding-left: 18px;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.pg-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.6em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-2);
+}
+
+.pg-outline {
+  padding-left: 0;
+  list-style: none;
+  counter-reset: pg-step;
+  display: grid;
+  gap: 12px;
+}
+
+.pg-outline > li {
+  counter-increment: pg-step;
+  position: relative;
+  padding-left: 34px;
+  font-size: 0.93rem;
+}
+
+.pg-outline > li::before {
+  content: counter(pg-step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 6px;
+}
+
+.pg-outline > li > strong {
+  display: block;
+  color: var(--text);
+  font-weight: 600;
+  margin-bottom: 6px;
+  line-height: 1.45;
+}
+
+.pg-outline ul {
+  padding-left: 18px;
+  margin-top: 6px;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+
+.pg-outline ul li {
+  position: relative;
+  color: var(--text-soft);
+  font-size: 0.87rem;
+  padding-left: 14px;
+  line-height: 1.5;
+}
+
+.pg-outline ul li::before {
+  content: "—";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+}
+
+.pg-checklist {
+  padding-left: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.pg-checklist li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.pg-checkbox {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  margin-top: 2px;
 }

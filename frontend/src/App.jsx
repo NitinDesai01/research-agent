@@ -13,6 +13,7 @@ import ReportView from "./components/ReportView.jsx";
 import CritiqueView from "./components/CritiqueView.jsx";
 import SourcesView from "./components/SourcesView.jsx";
 import VerificationView from "./components/VerificationView.jsx";
+import PaperGuideView from "./components/PaperGuideView.jsx";
 import Panel from "./components/Panel.jsx";
 import TopBar from "./components/TopBar.jsx";
 import Toast from "./components/Toast.jsx";
@@ -31,14 +32,17 @@ const STAGES = [
   "writing",
   "verifying",
   "critiquing",
+  "guiding",
   "done",
 ];
+
 const STAGE_LABELS = {
   searching: "Search",
   reading: "Read",
   writing: "Write",
   verifying: "Verify",
   critiquing: "Critique",
+  guiding: "Guide",
   done: "Done",
 };
 
@@ -179,6 +183,7 @@ export default function App() {
           writing: true,
           verifying: true,
           critiquing: true,
+          guiding: true,
           done: true,
         });
         setCurrentStage("done");
@@ -240,6 +245,7 @@ export default function App() {
         else if (stage === "writing") playSound("write");
         else if (stage === "verifying") playSound("verify");
         else if (stage === "critiquing") playSound("critique");
+        else if (stage === "guiding") playSound("verify");
         else if (stage === "done") playSound("done");
       }
     },
@@ -360,6 +366,7 @@ export default function App() {
       report: saved.report,
       critique: saved.critique,
       verification: saved.verification,
+      paper_guide: "",
       sources: saved.sources || [],
       errors: [],
       reader_notes: "",
@@ -370,6 +377,7 @@ export default function App() {
       writing: true,
       verifying: true,
       critiquing: true,
+      guiding: true,
       done: true,
     });
     setCurrentStage("done");
@@ -418,6 +426,7 @@ export default function App() {
                 <span className="inline-icon">→</span> Writer
                 <span className="inline-icon">→</span> Verifier
                 <span className="inline-icon">→</span> Critic
+                <span className="inline-icon">→</span> Guide
                 <br />
                 Specialized AI agents collaborate to build, verify, and score a
                 research report on any topic.
@@ -523,6 +532,16 @@ export default function App() {
             {result?.critique && (
               <Panel title="Critic Scorecard" icon="target" defaultOpen>
                 <CritiqueView critique={result.critique} />
+              </Panel>
+            )}
+
+            {result?.paper_guide && (
+              <Panel
+                title="How to Write This Paper"
+                icon="notes"
+                defaultOpen={false}
+              >
+                <PaperGuideView guide={result.paper_guide} />
               </Panel>
             )}
 

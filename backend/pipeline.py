@@ -1,8 +1,12 @@
 """Orchestration layer for the multi-agent research pipeline.
 
-Tier 1 upgrades:
-- Multi-source evidence gathering (top 3 sources in parallel)
-- Streaming Writer tokens via progress callbacks
+Stages:
+  1. Search Agent       — finds sources
+  2. Multi-source scrape (top 3) + Readers in parallel
+  3. Writer Chain       — streams the report
+  4. Verifier Chain     — checks citations
+  5. Critic Chain       — scores the report
+  6. Paper Guide Chain  — how to write a paper on this
 """
 from __future__ import annotations
 
@@ -18,6 +22,7 @@ from agents import (
 )
 from tools import web_search, scrape_url, tavily_extract
 from verifier import build_verifier_chain
+from paper_guide import build_paper_guide_chain
 
 _URL_RE = re.compile(r"https?://[^\s\)\]\>\"']+")
 _MAX_READER_SOURCES = 3
@@ -30,7 +35,6 @@ async def _fetch_one(candidate: Dict[str, str]) -> Tuple[Dict[str, str], str]:
     """Try Tavily extract, then requests. Returns (candidate, text)."""
     url = candidate["url"]
 
-    # Strategy A: Tavily extract
     try:
         text = await asyncio.to_thread(tavily_extract, url)
         if text and len(text.strip()) > 400:
@@ -38,7 +42,6 @@ async def _fetch_one(candidate: Dict[str, str]) -> Tuple[Dict[str, str], str]:
     except Exception:
         pass
 
-    # Strategy B: requests + BeautifulSoup
     try:
         text = await asyncio.to_thread(scrape_url, url)
         if text and len(text.strip()) > 400:
@@ -52,10 +55,7 @@ async def _fetch_one(candidate: Dict[str, str]) -> Tuple[Dict[str, str], str]:
 async def _gather_sources(
     candidates: List[Dict[str, str]],
 ) -> Tuple[List[Dict[str, str]], List[str]]:
-    """Scrape up to _MAX_READER_SOURCES candidates in parallel.
-
-    Returns (successful, failed_urls).
-    """
+    """Scrape up to _MAX_READER_SOURCES candidates in parallel."""
     top = candidates[:_MAX_READER_SOURCES]
     results = await asyncio.gather(
         *[_fetch_one(c) for c in top], return_exceptions=True
@@ -77,9 +77,6 @@ async def _gather_sources(
     return successful, failed
 
 
-# ---------------------------------------------------------------------------
-# Progress emit
-# ---------------------------------------------------------------------------
 def _emit(progress_cb, stage, **payload):
     if progress_cb:
         try:
@@ -92,7 +89,7 @@ def _emit(progress_cb, stage, **payload):
 # Main pipeline
 # ---------------------------------------------------------------------------
 def run_pipeline(topic: str, progress_cb=None) -> Dict[str, Any]:
-    """Run the full research pipeline (sync wrapper for thread execution)."""
+    """Synchronous wrapper — called from the SSE thread."""
     return asyncio.run(_run_pipeline_async(topic, progress_cb))
 
 
@@ -101,16 +98,17 @@ async def _run_pipeline_async(topic: str, progress_cb=None) -> Dict[str, Any]:
         "topic": topic,
         "search_results": [],
         "scraped_urls": [],
-        "reader_notes": "",       # merged notes from all readers
-        "reader_notes_list": [],  # per-source notes
+        "reader_notes": "",
+        "reader_notes_list": [],
         "report": "",
         "critique": "",
         "verification": "",
+        "paper_guide": "",
         "sources": [],
         "errors": [],
     }
 
-    # --- 1. Search -------------------------------------------------------
+    # --- 1. Search ------------------------------------------------------
     _emit(progress_cb, "searching", status="running")
     try:
         agent = build_search_agent()
@@ -148,15 +146,11 @@ async def _run_pipeline_async(topic: str, progress_cb=None) -> Dict[str, Any]:
         )
 
     if not successful:
-        # Fall back to the longest snippet
         chosen = max(
             result["search_results"], key=lambda r: len(r.get("content", ""))
         )
         successful = [
-            {
-                **chosen,
-                "scraped_text": chosen.get("content", ""),
-            }
+            {**chosen, "scraped_text": chosen.get("content", "")}
         ]
         result["errors"].append(
             "Could not scrape any source — using search snippets only."
@@ -271,7 +265,26 @@ async def _run_pipeline_async(topic: str, progress_cb=None) -> Dict[str, Any]:
     result["critique"] = critique
     _emit(progress_cb, "critiquing", status="done", critique=critique)
 
-    # --- 8. Sources -----------------------------------------------------
+    # --- 8. Paper Guide -------------------------------------------------
+    _emit(progress_cb, "guiding", status="running")
+    paper_guide = ""
+    try:
+        guide_chain = build_paper_guide_chain()
+        paper_guide = await asyncio.to_thread(
+            guide_chain.invoke,
+            {
+                "topic": topic,
+                "report": report,
+                "evidence": evidence,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        result["errors"].append(f"Paper guide failed: {exc}")
+
+    result["paper_guide"] = paper_guide
+    _emit(progress_cb, "guiding", status="done", paper_guide=paper_guide)
+
+    # --- 9. Sources -----------------------------------------------------
     sources = [
         {"title": r["title"], "url": r["url"]} for r in result["search_results"]
     ]
