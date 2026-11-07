@@ -15,12 +15,10 @@ MODEL_NAME = "openai/gpt-oss-20b"
 
 
 def _llm() -> ChatGroq:
-    if not GROQ_API_KEY:
-        raise RuntimeError("GROQ_API_KEY is not set.")
     return ChatGroq(
         model=MODEL_NAME,
         temperature=0,
-        max_tokens=2000, # <--- Changed this from 1200 to 2000
+        max_tokens=1200, # <-- Change this back to 1200
         api_key=GROQ_API_KEY,
     )
 

@@ -128,13 +128,13 @@ async def _run_pipeline_async(topic: str, progress_cb=None) -> Dict[str, Any]:
     _emit(progress_cb, "writing", status="done")
 
     # 6. Verifier
+        # --- 6. Verifier ----------------------------------------------------
     _emit(progress_cb, "verifying", status="running")
     try:
         verifier_chain = build_verifier_chain()
-        result["verification"] = await asyncio.to_thread(verifier_chain.invoke, {"report": report, "evidence": evidence})
-    except Exception as exc:
-        result["errors"].append(f"Verifier failed: {exc}")
-    _emit(progress_cb, "verifying", status="done")
+        result["verification"] = await asyncio.to_thread(
+            verifier_chain.invoke, {"report": report, "evidence": evidence[:2000]} # <-- ONLY SEND THE FIRST 2000 CHARS
+        )
 
     # 7. Critic
     _emit(progress_cb, "critiquing", status="running")
