@@ -20,10 +20,9 @@ def _llm() -> ChatGroq:
     return ChatGroq(
         model=MODEL_NAME,
         temperature=0,
-        max_tokens=1200,
+        max_tokens=2000, # <--- Changed this from 1200 to 2000
         api_key=GROQ_API_KEY,
     )
-
 
 # ---------------------------------------------------------------------------
 # 1. Search Agent
