@@ -14,9 +14,7 @@ export default function PaperGuideView({ guide }) {
       {sections.map((s, i) => (
         <div className="pg-section" key={i}>
           <h4 className="pg-title">{s.title}</h4>
-          {s.type === "paragraph" && (
-            <p className="pg-paragraph">{s.body}</p>
-          )}
+          {s.type === "paragraph" && <p className="pg-paragraph">{s.body}</p>}
           {s.type === "list" && (
             <ul className="pg-list">
               {s.items.map((it, j) => (
@@ -40,16 +38,6 @@ export default function PaperGuideView({ guide }) {
               ))}
             </ol>
           )}
-          {s.type === "checklist" && (
-            <ul className="pg-checklist">
-              {s.items.map((it, j) => (
-                <li key={j}>
-                  <span className="pg-checkbox">☐</span>
-                  {it}
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       ))}
     </div>
@@ -69,52 +57,63 @@ function parseGuide(text) {
     "ABSTRACT DRAFT:",
     "OUTLINE:",
     "KEY POINTS TO INCLUDE:",
-    "FIGURES AND TABLES TO CREATE:",
     "NOVELTY ANGLE:",
     "TARGET VENUES:",
-    "CITATION GAPS:",
     "COMMON PITFALLS TO AVOID:",
-    "CHECKLIST BEFORE SUBMISSION:",
   ];
 
   while (i < lines.length) {
-    const line = lines[i].trim();
+    const rawLine = lines[i].trim();
+    // Strip markdown asterisks so "**PAPER TYPE:**" becomes "PAPER TYPE:"
+    const cleanLine = rawLine.replace(/\*\*|__/g, "").toUpperCase();
 
-    const header = HEADERS.find((h) => line.startsWith(h));
+    const header = HEADERS.find((h) => cleanLine.startsWith(h));
     if (!header) {
       i++;
       continue;
     }
 
     const title = header.replace(":", "");
-    const nextIndex = findNextHeader(lines, i + 1, HEADERS);
+
+    let nextIndex = lines.length;
+    for (let j = i + 1; j < lines.length; j++) {
+      const nextClean = lines[j]
+        .trim()
+        .replace(/\*\*|__/g, "")
+        .toUpperCase();
+      if (HEADERS.some((h) => nextClean.startsWith(h))) {
+        nextIndex = j;
+        break;
+      }
+    }
+
     const block = lines.slice(i + 1, nextIndex).filter((l) => l.trim());
     i = nextIndex;
 
-    // Detect type
     if (header === "OUTLINE:") {
       out.push({ title, type: "outline", items: parseOutline(block) });
-    } else if (header === "CHECKLIST BEFORE SUBMISSION:") {
-      out.push({
-        title,
-        type: "checklist",
-        items: block
-          .map((l) => l.replace(/^[-*\[\]x\s]+/, "").trim())
-          .filter(Boolean),
-      });
-    } else if (block.some((l) => /^[-•*]/.test(l.trim()))) {
+    } else if (
+      block.some((l) => /^[-•*]/.test(l.trim()) || /^\d+\./.test(l.trim()))
+    ) {
       out.push({
         title,
         type: "list",
         items: block
-          .map((l) => l.trim().replace(/^[-•*]\s*/, ""))
+          .map((l) =>
+            l
+              .trim()
+              .replace(/^[-•*]\s*/, "")
+              .replace(/^\d+\.\s*/, "")
+              .replace(/\*\*/g, ""),
+          )
           .filter(Boolean),
       });
     } else {
       out.push({
         title,
         type: "paragraph",
-        body: block.map((l) => l.trim()).join(" "),
+        // Strip asterisks from paragraphs too
+        body: block.map((l) => l.trim().replace(/\*\*/g, "")).join(" "),
       });
     }
   }
@@ -122,20 +121,12 @@ function parseGuide(text) {
   return out;
 }
 
-function findNextHeader(lines, from, headers) {
-  for (let j = from; j < lines.length; j++) {
-    const t = lines[j].trim();
-    if (headers.some((h) => t.startsWith(h))) return j;
-  }
-  return lines.length;
-}
-
 function parseOutline(block) {
   const items = [];
   let current = null;
 
   for (const raw of block) {
-    const line = raw.trim();
+    const line = raw.trim().replace(/\*\*/g, ""); // Strip asterisks in outline
     const sectionMatch = line.match(/^\d+\.\s+(.+)/);
     if (sectionMatch) {
       if (current) items.push(current);

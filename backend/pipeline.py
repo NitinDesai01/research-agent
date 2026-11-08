@@ -77,7 +77,10 @@ async def _run_pipeline_async(topic: str, progress_cb=None) -> Dict[str, Any]:
             result["search_results"] = web_search(topic)
     except Exception as exc:
         result["errors"].append(f"Search failed: {exc}")
-        result["search_results"] = web_search(topic)
+        try:
+            result["search_results"] = web_search(topic)
+        except Exception as exc2:
+            result["errors"].append(f"Fallback search failed: {exc2}")
 
     _emit(progress_cb, "searching", status="done", count=len(result["search_results"]))
     if not result["search_results"]:
@@ -111,12 +114,15 @@ async def _run_pipeline_async(topic: str, progress_cb=None) -> Dict[str, Any]:
         evidence_parts.append(f"\n[DEEP READ of {r['url']}]\n{r['notes']}")
     evidence = "\n\n".join(evidence_parts)
 
-    # 5. Writer (Streaming)
+    # 5. Writer (Streaming & Token Optimized)
     _emit(progress_cb, "writing", status="running")
     report_chunks = []
     try:
         writer_chain = build_writer_chain()
-        async for chunk in writer_chain.astream({"topic": topic, "evidence": evidence}):
+        # Send only 1500 chars to save tokens for other agents
+        async for chunk in writer_chain.astream(
+            {"topic": topic, "evidence": evidence[:1500]}
+        ):
             if chunk:
                 report_chunks.append(chunk)
                 _emit(progress_cb, "writing", status="streaming", chunk=chunk)
@@ -124,36 +130,55 @@ async def _run_pipeline_async(topic: str, progress_cb=None) -> Dict[str, Any]:
         result["errors"].append(f"Writer failed: {exc}")
     
     report = "".join(report_chunks)
+    if not report:
+        report = f"# Research Report: {topic}\n\n_Report generation failed._"
     result["report"] = report
     _emit(progress_cb, "writing", status="done")
 
+    # --- WAIT 5 SECONDS for Groq Token Bucket to refill ---
+    await asyncio.sleep(5)
+
     # 6. Verifier
-        # --- 6. Verifier ----------------------------------------------------
     _emit(progress_cb, "verifying", status="running")
     try:
         verifier_chain = build_verifier_chain()
         result["verification"] = await asyncio.to_thread(
-            verifier_chain.invoke, {"report": report, "evidence": evidence[:2000]} # <-- ONLY SEND THE FIRST 2000 CHARS
+            verifier_chain.invoke, 
+            # Send only 1000 chars so it doesn't crash
+            {"report": report, "evidence": evidence[:1000]} 
         )
+    except Exception as exc:
+        result["errors"].append(f"Verifier failed: {exc}")
+    _emit(progress_cb, "verifying", status="done")
+
+    # --- WAIT 5 SECONDS for Groq Token Bucket to refill ---
+    await asyncio.sleep(5)
 
     # 7. Critic
     _emit(progress_cb, "critiquing", status="running")
     try:
         critic_chain = build_critic_chain()
-        result["critique"] = await asyncio.to_thread(critic_chain.invoke, {"topic": topic, "report": report})
+        result["critique"] = await asyncio.to_thread(
+            critic_chain.invoke, 
+            {"topic": topic, "report": report}
+        )
     except Exception as exc:
         result["errors"].append(f"Critic failed: {exc}")
+        result["critique"] = "OVERALL SCORE: 0/10\n\nCritique unavailable."
     _emit(progress_cb, "critiquing", status="done")
 
-    # 8. Paper Guide (WITH DEBUG LOGS)
+    # --- WAIT 5 SECONDS for Groq Token Bucket to refill ---
+    await asyncio.sleep(5)
+
+    # 8. Paper Guide
     _emit(progress_cb, "guiding", status="running")
-    print(f"\n--> [DEBUG] Starting Paper Guide for: {topic}")
     try:
         guide_chain = build_paper_guide_chain()
-        result["paper_guide"] = await asyncio.to_thread(guide_chain.invoke, {"topic": topic, "report": report, "evidence": evidence})
-        print(f"--> [DEBUG] Paper Guide SUCCESS. Length: {len(result['paper_guide'])}")
+        result["paper_guide"] = await asyncio.to_thread(
+            guide_chain.invoke, 
+            {"topic": topic, "report": report, "evidence": evidence[:1000]}
+        )
     except Exception as exc:
-        print(f"--> [DEBUG] Paper Guide FAILED: {exc}")
         result["errors"].append(f"Paper guide failed: {exc}")
     _emit(progress_cb, "guiding", status="done")
 

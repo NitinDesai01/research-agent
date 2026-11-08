@@ -16,7 +16,6 @@ CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY")
 
 _clerk: Optional[Clerk] = None
 
-
 def _get_clerk() -> Clerk:
     global _clerk
     if _clerk is None:
@@ -35,12 +34,14 @@ def get_current_user_id(request: Request) -> Optional[str]:
             _get_clerk(),
             request,
             AuthenticateRequestOptions(
-                authorized_parties=None,  # accept any origin (Vercel previews)
+                accepts_token=["session_token"],
+                authorized_parties=["http://localhost:5173", "http://localhost:3000"],
             ),
         )
         if request_state.is_signed_in:
             return request_state.payload.get("sub")
-    except Exception:
+    except Exception as e:
+        print(f"[Clerk Auth] Token verification failed: {e}")
         return None
     return None
 

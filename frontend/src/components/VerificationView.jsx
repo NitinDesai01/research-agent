@@ -1,11 +1,16 @@
 export default function VerificationView({ verification }) {
   if (!verification) {
     return (
-      <p style={{ color: "var(--text-muted)" }}>No verification available.</p>
+      <p style={{ color: "var(--danger)" }}>
+        Citation Verification failed to generate. Check backend terminal for 429
+        Rate Limit errors.
+      </p>
     );
   }
 
-  const lines = verification.split("\n");
+  // Strip markdown asterisks globally
+  const cleanText = verification.replace(/\*\*/g, "").replace(/__/g, "");
+  const lines = cleanText.split("\n");
   const elements = [];
   let i = 0;
 
@@ -66,7 +71,8 @@ export default function VerificationView({ verification }) {
       continue;
     }
 
-    if (/^\d+\.\s*CLAIM:/.test(line)) {
+    // More robust regex to catch any variation of the CLAIM header
+    if (/^\d+\.\s*CLAIM:/i.test(line) || /^CLAIM:/i.test(line)) {
       elements.push(
         <p
           key={i}

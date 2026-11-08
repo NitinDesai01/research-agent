@@ -529,19 +529,34 @@ export default function App() {
               </Panel>
             )}
 
-            {result?.critique && (
-              <Panel title="Critic Scorecard" icon="target" defaultOpen>
-                <CritiqueView critique={result.critique} />
+            {/* CRITIC SCORECARD ADDED BACK IN */}
+            {result && (
+              <Panel title="Critic Scorecard" icon="target" defaultOpen={true}>
+                {result.critique ? (
+                  <CritiqueView critique={result.critique} />
+                ) : (
+                  <p style={{ color: "var(--danger)" }}>
+                    Critic Scorecard failed to generate. Check backend terminal
+                    for 429 Rate Limit errors.
+                  </p>
+                )}
               </Panel>
             )}
 
-            {result?.paper_guide && (
+            {result && (
               <Panel
                 title="How to Write This Paper"
                 icon="notes"
-                defaultOpen={false}
+                defaultOpen={true}
               >
-                <PaperGuideView guide={result.paper_guide} />
+                {result.paper_guide ? (
+                  <PaperGuideView guide={result.paper_guide} />
+                ) : (
+                  <p style={{ color: "var(--danger)" }}>
+                    Paper guide failed to generate. Check backend terminal for
+                    429 Rate Limit errors.
+                  </p>
+                )}
               </Panel>
             )}
 
