@@ -523,13 +523,25 @@ export default function App() {
               </Panel>
             )}
 
-            {result?.verification && (
-              <Panel title="Citation Verification" icon="shield" defaultOpen>
-                <VerificationView verification={result.verification} />
+            {/* CITATION VERIFICATION WITH FALLBACK */}
+            {result && (
+              <Panel
+                title="Citation Verification"
+                icon="shield"
+                defaultOpen={true}
+              >
+                {result.verification ? (
+                  <VerificationView verification={result.verification} />
+                ) : (
+                  <p style={{ color: "var(--danger)" }}>
+                    Citation Verification failed to generate. Check backend
+                    terminal for 429 Rate Limit errors.
+                  </p>
+                )}
               </Panel>
             )}
 
-            {/* CRITIC SCORECARD ADDED BACK IN */}
+            {/* CRITIC SCORECARD WITH FALLBACK */}
             {result && (
               <Panel title="Critic Scorecard" icon="target" defaultOpen={true}>
                 {result.critique ? (
@@ -543,6 +555,7 @@ export default function App() {
               </Panel>
             )}
 
+            {/* PAPER GUIDE WITH FALLBACK */}
             {result && (
               <Panel
                 title="How to Write This Paper"

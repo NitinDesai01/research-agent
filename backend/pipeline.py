@@ -114,14 +114,17 @@ async def _run_pipeline_async(topic: str, progress_cb=None) -> Dict[str, Any]:
         evidence_parts.append(f"\n[DEEP READ of {r['url']}]\n{r['notes']}")
     evidence = "\n\n".join(evidence_parts)
 
+    # --- WAIT 10 SECONDS before Writer to reset Tokens Per Minute ---
+    await asyncio.sleep(10)
+
     # 5. Writer (Streaming & Token Optimized)
     _emit(progress_cb, "writing", status="running")
     report_chunks = []
     try:
         writer_chain = build_writer_chain()
-        # Send only 1200 chars to save tokens for other agents
+        # Send only 800 chars to guarantee it stays under 8000 TPM
         async for chunk in writer_chain.astream(
-            {"topic": topic, "evidence": evidence[:1200]}
+            {"topic": topic, "evidence": evidence[:800]}
         ):
             if chunk:
                 report_chunks.append(chunk)
@@ -144,8 +147,8 @@ async def _run_pipeline_async(topic: str, progress_cb=None) -> Dict[str, Any]:
         verifier_chain = build_verifier_chain()
         result["verification"] = await asyncio.to_thread(
             verifier_chain.invoke, 
-            # Send only 800 chars to guarantee it fits in the 8000 TPM limit
-            {"report": report, "evidence": evidence[:800]} 
+            # Send only 500 chars
+            {"report": report, "evidence": evidence[:500]} 
         )
     except Exception as exc:
         result["errors"].append(f"Verifier failed: {exc}")
@@ -176,7 +179,7 @@ async def _run_pipeline_async(topic: str, progress_cb=None) -> Dict[str, Any]:
         guide_chain = build_paper_guide_chain()
         result["paper_guide"] = await asyncio.to_thread(
             guide_chain.invoke, 
-            {"topic": topic, "report": report, "evidence": evidence[:800]}
+            {"topic": topic, "report": report, "evidence": evidence[:500]}
         )
     except Exception as exc:
         result["errors"].append(f"Paper guide failed: {exc}")
