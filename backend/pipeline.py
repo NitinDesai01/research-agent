@@ -119,9 +119,9 @@ async def _run_pipeline_async(topic: str, progress_cb=None) -> Dict[str, Any]:
     report_chunks = []
     try:
         writer_chain = build_writer_chain()
-        # Send only 1500 chars to save tokens for other agents
+        # Send only 1200 chars to save tokens for other agents
         async for chunk in writer_chain.astream(
-            {"topic": topic, "evidence": evidence[:1500]}
+            {"topic": topic, "evidence": evidence[:1200]}
         ):
             if chunk:
                 report_chunks.append(chunk)
@@ -135,8 +135,8 @@ async def _run_pipeline_async(topic: str, progress_cb=None) -> Dict[str, Any]:
     result["report"] = report
     _emit(progress_cb, "writing", status="done")
 
-    # --- WAIT 5 SECONDS for Groq Token Bucket to refill ---
-    await asyncio.sleep(5)
+    # --- WAIT 15 SECONDS for Groq TPM Bucket to refill ---
+    await asyncio.sleep(15)
 
     # 6. Verifier
     _emit(progress_cb, "verifying", status="running")
@@ -144,15 +144,15 @@ async def _run_pipeline_async(topic: str, progress_cb=None) -> Dict[str, Any]:
         verifier_chain = build_verifier_chain()
         result["verification"] = await asyncio.to_thread(
             verifier_chain.invoke, 
-            # Send only 1000 chars so it doesn't crash
-            {"report": report, "evidence": evidence[:1000]} 
+            # Send only 800 chars to guarantee it fits in the 8000 TPM limit
+            {"report": report, "evidence": evidence[:800]} 
         )
     except Exception as exc:
         result["errors"].append(f"Verifier failed: {exc}")
     _emit(progress_cb, "verifying", status="done")
 
-    # --- WAIT 5 SECONDS for Groq Token Bucket to refill ---
-    await asyncio.sleep(5)
+    # --- WAIT 15 SECONDS for Groq TPM Bucket to refill ---
+    await asyncio.sleep(15)
 
     # 7. Critic
     _emit(progress_cb, "critiquing", status="running")
@@ -167,8 +167,8 @@ async def _run_pipeline_async(topic: str, progress_cb=None) -> Dict[str, Any]:
         result["critique"] = "OVERALL SCORE: 0/10\n\nCritique unavailable."
     _emit(progress_cb, "critiquing", status="done")
 
-    # --- WAIT 5 SECONDS for Groq Token Bucket to refill ---
-    await asyncio.sleep(5)
+    # --- WAIT 15 SECONDS for Groq TPM Bucket to refill ---
+    await asyncio.sleep(15)
 
     # 8. Paper Guide
     _emit(progress_cb, "guiding", status="running")
@@ -176,7 +176,7 @@ async def _run_pipeline_async(topic: str, progress_cb=None) -> Dict[str, Any]:
         guide_chain = build_paper_guide_chain()
         result["paper_guide"] = await asyncio.to_thread(
             guide_chain.invoke, 
-            {"topic": topic, "report": report, "evidence": evidence[:1000]}
+            {"topic": topic, "report": report, "evidence": evidence[:800]}
         )
     except Exception as exc:
         result["errors"].append(f"Paper guide failed: {exc}")

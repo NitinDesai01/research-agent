@@ -10,12 +10,14 @@ PAPER_GUIDE_PROMPT = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """You are a Paper Writing Coach. Produce a practical guide for turning this research into an academic paper or survey paper. Use ONLY the supplied report and evidence.
+            """You are a Paper Writing Coach. Produce a practical guide for turning this research into an academic paper. Use ONLY the supplied report and evidence.
 
 Respond in EXACTLY this structure, and keep it brief:
 
 PAPER TYPE:
-<research paper | survey paper> - <one sentence why>
+Evaluate BOTH options below and explain which fits this specific topic better.
+- Option A (Survey Paper): A comprehensive review of existing literature and current trends.
+- Option B (Original Research): Proposing a new method, experiment, or novel analysis based on the gaps found in the evidence.
 
 SUGGESTED TITLE:
 <a concrete title>
@@ -36,7 +38,7 @@ KEY POINTS TO INCLUDE:
 - <claim from report>
 
 NOVELTY ANGLE:
-<one paragraph>
+<How can the author turn this into original research? What is the missing experiment, dataset, or hypothesis they should test?>
 
 TARGET VENUES:
 - <venue 1>
