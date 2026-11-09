@@ -20,7 +20,6 @@ import Toast from "./components/Toast.jsx";
 import History from "./components/History.jsx";
 import AuroraBackground from "./components/AuroraBackground.jsx";
 import GameAgent from "./components/GameAgent.jsx";
-import Sidebar from "./components/Sidebar.jsx";
 import FollowUpChat from "./components/FollowUpChat.jsx";
 import TopicSuggestions from "./components/TopicSuggestions.jsx";
 import SkeletonPanel from "./components/SkeletonPanel.jsx";
@@ -52,6 +51,7 @@ const SOUND_KEY = "research_sound_enabled";
 const MAX_HISTORY = 10;
 
 export default function App() {
+  // Note: getToken is still here because we still allow users to "Save" a report to the database
   const { getToken, isSignedIn } = useAuth();
 
   const [topic, setTopic] = useState("");
@@ -65,7 +65,6 @@ export default function App() {
   const [history, setHistory] = useState(() => loadHistory());
   const [toasts, setToasts] = useState([]);
   const [cameFromCache, setCameFromCache] = useState(false);
-  const [sidebarRefresh, setSidebarRefresh] = useState(0);
 
   const [soundEnabled, setSoundEnabled] = useState(() => {
     if (typeof window === "undefined") return true;
@@ -352,254 +351,222 @@ export default function App() {
       });
       if (!resp.ok) throw new Error(`Save failed: ${resp.status}`);
       pushToast("Report saved", "success");
-      setSidebarRefresh((n) => n + 1);
     } catch (err) {
       pushToast(String(err.message || err), "error");
     }
-  };
-
-  const openSavedReport = (saved) => {
-    reset();
-    setTopic(saved.topic);
-    setResult({
-      topic: saved.topic,
-      report: saved.report,
-      critique: saved.critique,
-      verification: saved.verification,
-      paper_guide: "",
-      sources: saved.sources || [],
-      errors: [],
-      reader_notes: "",
-    });
-    setCompleted({
-      searching: true,
-      reading: true,
-      writing: true,
-      verifying: true,
-      critiquing: true,
-      guiding: true,
-      done: true,
-    });
-    setCurrentStage("done");
-    pushToast("Loaded saved report", "success");
   };
 
   return (
     <>
       <AuroraBackground />
 
-      <div className="app-shell">
-        <SignedIn>
-          <Sidebar onOpen={openSavedReport} refreshKey={sidebarRefresh} />
-        </SignedIn>
-
-        <div className="app-main">
-          <div className="app">
-            <TopBar
-              theme={theme}
-              onToggleTheme={toggleTheme}
-              soundEnabled={soundEnabled}
-              onToggleSound={toggleSound}
-              rightSlot={
-                <>
-                  <SignedOut>
-                    <SignInButton mode="modal">
-                      <button type="button" className="sign-in-btn">
-                        Sign in
-                      </button>
-                    </SignInButton>
-                  </SignedOut>
-                  <SignedIn>
-                    <UserButton afterSignOutUrl="/" />
-                  </SignedIn>
-                </>
-              }
-            />
-
-            <section className="hero">
-              <span className="hero-badge">Multi-agent pipeline</span>
-              <h1>
-                <span className="gradient">Research Agent</span>
-              </h1>
-              <p>
-                Search <span className="inline-icon">→</span> Reader
-                <span className="inline-icon">→</span> Writer
-                <span className="inline-icon">→</span> Verifier
-                <span className="inline-icon">→</span> Critic
-                <span className="inline-icon">→</span> Guide
-                <br />
-                Specialized AI agents collaborate to build, verify, and score a
-                research report on any topic.
-              </p>
-            </section>
-
-            <TopicForm
-              ref={inputRef}
-              onSubmit={handleSubmit}
-              disabled={running}
-            />
-
-            {!running && !result && (
-              <TopicSuggestions onSelect={handleSubmit} disabled={running} />
-            )}
-
-            {history.length > 0 && !running && !result && (
-              <History
-                items={history}
-                onSelect={handleSubmit}
-                onClear={clearHistory}
-              />
-            )}
-
-            {currentStage && (
-              <PipelineStepper
-                stages={STAGES}
-                labels={STAGE_LABELS}
-                current={currentStage}
-                completed={completed}
-              />
-            )}
-
-            {running && <GameAgent />}
-
-            {running && !streamedReport && (
+      {/* 
+        We removed the <div className="app-shell"> and <Sidebar /> 
+        so the main content takes up the full screen.
+      */}
+      <div className="app-main">
+        <div className="app">
+          <TopBar
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            soundEnabled={soundEnabled}
+            onToggleSound={toggleSound}
+            rightSlot={
               <>
-                <SkeletonPanel title="Searching sources…" />
-                <SkeletonPanel title="Reading and extracting…" />
+                <SignedOut>
+                  <SignInButton mode="modal">
+                    <button type="button" className="sign-in-btn">
+                      Sign in
+                    </button>
+                  </SignInButton>
+                </SignedOut>
+                <SignedIn>
+                  <UserButton afterSignOutUrl="/" />
+                </SignedIn>
               </>
-            )}
+            }
+          />
 
-            {errors.length > 0 && (
-              <div className="errors">
-                <strong>Pipeline warnings</strong>
-                <ul>
-                  {errors.map((e, i) => (
-                    <li key={i}>{e}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+          <section className="hero">
+            <span className="hero-badge">Multi-agent pipeline</span>
+            <h1>
+              <span className="gradient">Research Agent</span>
+            </h1>
+            <p>
+              Search <span className="inline-icon">→</span> Reader
+              <span className="inline-icon">→</span> Writer
+              <span className="inline-icon">→</span> Verifier
+              <span className="inline-icon">→</span> Critic
+              <span className="inline-icon">→</span> Guide
+              <br />
+              Specialized AI agents collaborate to build, verify, and score a
+              research report on any topic.
+            </p>
+          </section>
 
-            {streaming && streamedReport && (
-              <Panel
-                title="Research Report"
-                icon="document"
-                meta="writing…"
-                defaultOpen
-              >
-                <ReportView
-                  report={streamedReport}
-                  topic={topic}
-                  onToast={pushToast}
-                  streaming
-                />
-              </Panel>
-            )}
+          <TopicForm
+            ref={inputRef}
+            onSubmit={handleSubmit}
+            disabled={running}
+          />
 
-            {result?.report && !streaming && (
-              <Panel
-                title="Research Report"
-                icon="document"
-                meta={
-                  cameFromCache
-                    ? "cached"
-                    : `${readingTime(result.report)} min read`
-                }
-                defaultOpen
-              >
-                <ReportView
-                  report={result.report}
-                  topic={result.topic}
-                  onToast={pushToast}
-                  verification={result.verification}
-                  onSave={saveReport}
-                />
-              </Panel>
-            )}
+          {!running && !result && (
+            <TopicSuggestions onSelect={handleSubmit} disabled={running} />
+          )}
 
-            {result?.report && (
-              <Panel title="Ask a Follow-Up" icon="notes" defaultOpen={false}>
-                <FollowUpChat topic={result.topic} report={result.report} />
-              </Panel>
-            )}
+          {history.length > 0 && !running && !result && (
+            <History
+              items={history}
+              onSelect={handleSubmit}
+              onClear={clearHistory}
+            />
+          )}
 
-            {/* CITATION VERIFICATION WITH FALLBACK */}
-            {result && (
-              <Panel
-                title="Citation Verification"
-                icon="shield"
-                defaultOpen={true}
-              >
-                {result.verification ? (
-                  <VerificationView verification={result.verification} />
-                ) : (
-                  <p style={{ color: "var(--danger)" }}>
-                    Citation Verification failed to generate. Check backend
-                    terminal for 429 Rate Limit errors.
-                  </p>
-                )}
-              </Panel>
-            )}
+          {currentStage && (
+            <PipelineStepper
+              stages={STAGES}
+              labels={STAGE_LABELS}
+              current={currentStage}
+              completed={completed}
+            />
+          )}
 
-            {/* CRITIC SCORECARD WITH FALLBACK */}
-            {result && (
-              <Panel title="Critic Scorecard" icon="target" defaultOpen={true}>
-                {result.critique ? (
-                  <CritiqueView critique={result.critique} />
-                ) : (
-                  <p style={{ color: "var(--danger)" }}>
-                    Critic Scorecard failed to generate. Check backend terminal
-                    for 429 Rate Limit errors.
-                  </p>
-                )}
-              </Panel>
-            )}
+          {running && <GameAgent />}
 
-            {/* PAPER GUIDE WITH FALLBACK */}
-            {result && (
-              <Panel
-                title="How to Write This Paper"
-                icon="notes"
-                defaultOpen={true}
-              >
-                {result.paper_guide ? (
-                  <PaperGuideView guide={result.paper_guide} />
-                ) : (
-                  <p style={{ color: "var(--danger)" }}>
-                    Paper guide failed to generate. Check backend terminal for
-                    429 Rate Limit errors.
-                  </p>
-                )}
-              </Panel>
-            )}
+          {running && !streamedReport && (
+            <>
+              <SkeletonPanel title="Searching sources…" />
+              <SkeletonPanel title="Reading and extracting…" />
+            </>
+          )}
 
-            {result?.sources?.length > 0 && (
-              <Panel
-                title="Sources"
-                icon="link"
-                meta={`${result.sources.length} references`}
-                defaultOpen={false}
-              >
-                <SourcesView sources={result.sources} />
-              </Panel>
-            )}
-
-            {result?.reader_notes && (
-              <Panel title="Reader Notes" icon="notes" defaultOpen={false}>
-                <div className="notes">{result.reader_notes}</div>
-              </Panel>
-            )}
-
-            <div className="footer">
-              Built with FastAPI, LangChain, Groq &amp; Tavily ·{" "}
-              <a
-                href="https://github.com/NitinDesai01/research-agent"
-                target="_blank"
-                rel="noreferrer"
-              >
-                View source
-              </a>
+          {errors.length > 0 && (
+            <div className="errors">
+              <strong>Pipeline warnings</strong>
+              <ul>
+                {errors.map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
+              </ul>
             </div>
+          )}
+
+          {streaming && streamedReport && (
+            <Panel
+              title="Research Report"
+              icon="document"
+              meta="writing…"
+              defaultOpen
+            >
+              <ReportView
+                report={streamedReport}
+                topic={topic}
+                onToast={pushToast}
+                streaming
+              />
+            </Panel>
+          )}
+
+          {result?.report && !streaming && (
+            <Panel
+              title="Research Report"
+              icon="document"
+              meta={
+                cameFromCache
+                  ? "cached"
+                  : `${readingTime(result.report)} min read`
+              }
+              defaultOpen
+            >
+              <ReportView
+                report={result.report}
+                topic={result.topic}
+                onToast={pushToast}
+                verification={result.verification}
+                onSave={saveReport}
+              />
+            </Panel>
+          )}
+
+          {result?.report && (
+            <Panel title="Ask a Follow-Up" icon="notes" defaultOpen={false}>
+              <FollowUpChat topic={result.topic} report={result.report} />
+            </Panel>
+          )}
+
+          {result && (
+            <Panel
+              title="Citation Verification"
+              icon="shield"
+              defaultOpen={true}
+            >
+              {result.verification ? (
+                <VerificationView verification={result.verification} />
+              ) : (
+                <p style={{ color: "var(--danger)" }}>
+                  Citation Verification failed to generate. Check backend
+                  terminal for 429 Rate Limit errors.
+                </p>
+              )}
+            </Panel>
+          )}
+
+          {result && (
+            <Panel title="Critic Scorecard" icon="target" defaultOpen={true}>
+              {result.critique ? (
+                <CritiqueView critique={result.critique} />
+              ) : (
+                <p style={{ color: "var(--danger)" }}>
+                  Critic Scorecard failed to generate. Check backend terminal
+                  for 429 Rate Limit errors.
+                </p>
+              )}
+            </Panel>
+          )}
+
+          {result && (
+            <Panel
+              title="How to Write This Paper"
+              icon="notes"
+              defaultOpen={true}
+            >
+              {result.paper_guide ? (
+                <PaperGuideView guide={result.paper_guide} />
+              ) : (
+                <p style={{ color: "var(--danger)" }}>
+                  Paper guide failed to generate. Check backend terminal for 429
+                  Rate Limit errors.
+                </p>
+              )}
+            </Panel>
+          )}
+
+          {result?.sources?.length > 0 && (
+            <Panel
+              title="Sources"
+              icon="link"
+              meta={`${result.sources.length} references`}
+              defaultOpen={false}
+            >
+              <SourcesView sources={result.sources} />
+            </Panel>
+          )}
+
+          {result?.reader_notes && (
+            <Panel title="Reader Notes" icon="notes" defaultOpen={false}>
+              <div className="notes">{result.reader_notes}</div>
+            </Panel>
+          )}
+
+          <div className="footer">
+            Built with FastAPI, LangChain, Groq &amp; Tavily ·{" "}
+            <a
+              href="https://github.com/NitinDesai01/research-agent"
+              target="_blank"
+              rel="noreferrer"
+            >
+              View source
+            </a>
           </div>
         </div>
       </div>
