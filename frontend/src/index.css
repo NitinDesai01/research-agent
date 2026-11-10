@@ -159,12 +159,29 @@ body {
 /* =========================================================
    Layout
    ========================================================= */
-.app {
+/* =========================================================
+   App Layout (Responsive, No Sidebar)
+   ========================================================= */
+.app-main {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
   position: relative;
   z-index: 1;
-  max-width: 1180px;
-  margin: 0 auto;
+}
+
+.app {
+  width: 100%;
+  max-width: 1080px; /* Keeps it readable on big screens */
   padding: 32px 24px 100px;
+  margin: 0 auto;
+}
+
+@media (max-width: 720px) {
+  .app {
+    padding: 20px 14px 60px;
+  }
 }
 
 /* =========================================================

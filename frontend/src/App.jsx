@@ -51,7 +51,6 @@ const SOUND_KEY = "research_sound_enabled";
 const MAX_HISTORY = 10;
 
 export default function App() {
-  // Note: getToken is still here because we still allow users to "Save" a report to the database
   const { getToken, isSignedIn } = useAuth();
 
   const [topic, setTopic] = useState("");
@@ -360,10 +359,6 @@ export default function App() {
     <>
       <AuroraBackground />
 
-      {/* 
-        We removed the <div className="app-shell"> and <Sidebar /> 
-        so the main content takes up the full screen.
-      */}
       <div className="app-main">
         <div className="app">
           <TopBar
