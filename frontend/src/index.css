@@ -2471,3 +2471,290 @@ body {
   display: flex;
   justify-content: center; /* Centers the app on wide screens */
 }
+/* =========================================================
+   PREMIUM UI UPGRADE (Theme-Aware)
+   ========================================================= */
+
+/* 1. Ambient Background */
+body {
+  background-color: var(--bg) !important;
+  background-image:
+    radial-gradient(
+      circle at 15% 50%,
+      rgba(99, 102, 241, 0.05),
+      transparent 25%
+    ),
+    radial-gradient(
+      circle at 85% 30%,
+      rgba(139, 92, 246, 0.05),
+      transparent 25%
+    ),
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px) !important;
+  background-size:
+    100% 100%,
+    100% 100%,
+    40px 40px,
+    40px 40px !important;
+  background-attachment: fixed !important;
+  transition: background-color 0.3s ease !important;
+}
+
+/* 2. Center & Constrain Layout */
+.app-main {
+  display: flex !important;
+  justify-content: center !important;
+}
+
+.app {
+  max-width: 860px !important;
+  width: 100% !important;
+  margin: 0 auto !important;
+}
+
+/* 3. Hero Typography */
+.hero h1 .gradient {
+  background: linear-gradient(
+    135deg,
+    var(--accent) 0%,
+    var(--accent-2) 100%
+  ) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+  text-shadow: 0 0 40px var(--accent-soft) !important;
+}
+
+.hero p {
+  font-size: 1.1rem !important;
+  color: var(--text-soft) !important;
+  max-width: 500px !important;
+  margin: 0 auto !important;
+}
+
+/* 4. The Floating Glass Search Bar */
+.topic-form {
+  background: var(--surface) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: 99px !important;
+  padding: 8px 8px 8px 24px !important;
+  box-shadow: var(--shadow-lg) !important;
+  transition: all 0.3s ease !important;
+}
+
+.topic-form:focus-within {
+  border-color: var(--accent) !important;
+  box-shadow:
+    0 0 0 4px var(--accent-soft),
+    var(--shadow-lg) !important;
+}
+
+.topic-form input {
+  font-size: 1.05rem !important;
+  color: var(--text) !important;
+}
+
+.topic-form button {
+  background: var(--text) !important;
+  color: var(--bg) !important;
+  border-radius: 99px !important;
+  padding: 0 24px !important;
+  height: 48px !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+}
+
+.topic-form button:hover:not(:disabled) {
+  transform: scale(1.03) !important;
+  opacity: 0.9 !important;
+}
+
+/* 5. Premium Topic Suggestions */
+.suggestions {
+  max-width: 100% !important;
+  margin-top: 32px !important;
+}
+
+.suggestion-category {
+  color: var(--text-muted) !important;
+  font-size: 0.7rem !important;
+  letter-spacing: 0.1em !important;
+  margin-bottom: 12px !important;
+  margin-top: 24px !important;
+}
+
+.suggestion-chip {
+  background: var(--surface-solid) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 99px !important;
+  padding: 10px 20px !important;
+  color: var(--text-soft) !important;
+  transition: all 0.2s ease !important;
+}
+
+.suggestion-chip:hover {
+  background: var(--surface-hover) !important;
+  border-color: var(--accent) !important;
+  color: var(--text) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* 6. Glassmorphism Panels */
+.panel {
+  background: var(--surface) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 20px !important;
+  box-shadow: var(--shadow) !important;
+}
+
+.panel-header {
+  border-bottom: 1px solid var(--border) !important;
+}
+
+/* 7. Stepper Glow */
+.step.active .step-dot {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 20px var(--accent-soft) !important;
+}
+
+.step.done .step-dot {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+
+/* 8. TOC Elegance */
+.toc-link.active {
+  color: var(--accent) !important;
+}
+.toc-link::before {
+  background: var(--accent) !important;
+}
+
+/* 9. Toolbar Buttons */
+.tool-btn {
+  background: var(--surface-solid) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: 99px !important;
+}
+.tool-btn:hover {
+  background: var(--surface-hover) !important;
+  color: var(--text) !important;
+}
+/* =========================================================
+   MOBILE RESPONSIVENESS FIXES
+   ========================================================= */
+@media (max-width: 768px) {
+  /* 1. Fix the Container Padding */
+  .app {
+    padding: 20px 16px 60px !important;
+  }
+
+  /* 2. Fix the Typography */
+  .hero {
+    margin-top: 24px !important;
+    margin-bottom: 32px !important;
+  }
+
+  .hero h1 {
+    font-size: 2.2rem !important;
+    line-height: 1.2 !important;
+  }
+
+  .hero p {
+    font-size: 0.95rem !important;
+    padding: 0 10px !important;
+  }
+
+  /* 3. Fix the Search Bar */
+  .topic-form {
+    flex-direction: column !important;
+    border-radius: 20px !important;
+    padding: 8px !important;
+    gap: 8px !important;
+  }
+
+  .topic-form input {
+    padding: 16px !important;
+    text-align: center !important;
+  }
+
+  .topic-form button {
+    width: 100% !important;
+    height: 52px !important;
+    justify-content: center !important;
+  }
+
+  .kbd-hint {
+    display: none !important;
+  }
+
+  /* 4. Fix the Stepper (The main culprit) */
+  .stepper {
+    flex-wrap: wrap !important;
+    gap: 16px !important;
+    padding: 16px 8px !important;
+    justify-content: center !important;
+  }
+
+  .step {
+    flex: 0 0 calc(33.333% - 16px) !important; /* 3 items per row */
+    margin-bottom: 8px !important;
+  }
+
+  .step-dot {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 0.75rem !important;
+    margin-bottom: 6px !important;
+  }
+
+  .step-label {
+    font-size: 0.6rem !important;
+  }
+
+  /* Hide the connecting lines on mobile */
+  .step:not(:last-child)::after {
+    display: none !important;
+  }
+
+  /* 5. Fix Topic Suggestions */
+  .suggestions {
+    margin-top: 24px !important;
+  }
+
+  .suggestion-chips {
+    justify-content: center !important;
+  }
+
+  .suggestion-chip {
+    width: 100% !important;
+    text-align: center !important;
+  }
+
+  /* 6. Fix Panels */
+  .panel-header {
+    padding: 16px !important;
+  }
+
+  .panel-body {
+    padding: 16px !important;
+  }
+
+  /* 7. Fix Report Layout */
+  .report-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .toc {
+    display: none !important;
+  }
+
+  .report-toolbar {
+    justify-content: center !important;
+  }
+}

@@ -124,24 +124,29 @@ async def chat(request: Request, req: ChatRequest):
         [
             (
                 "system",
-                """You are a research assistant. Answer the user's question
-using ONLY the provided report. If the report doesn't contain the answer,
-say so honestly — do not invent facts.""",
+                """You are a helpful research assistant. 
+You are answering questions about a specific research report.
+Use the provided report context to answer the user's question. 
+If the answer is truly not in the report, you may use your general knowledge to answer, but clarify that it comes from outside the report.
+
+REPORT CONTEXT:
+{report}
+""",
             ),
             (
                 "human",
-                "TOPIC: {topic}\n\nREPORT:\n{report}\n\nQUESTION: {question}",
+                "{question}",
             ),
         ]
     )
     chain = prompt | _llm() | StrOutputParser()
 
     try:
+        # We pass the report as a variable, not in the user prompt
         answer = await asyncio.to_thread(
             chain.invoke,
             {
-                "topic": req.topic,
-                "report": req.report[:8000],
+                "report": req.report,
                 "question": req.question,
             },
         )
